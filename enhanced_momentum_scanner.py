@@ -2,7 +2,10 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import ta
+try:
+    import ta
+except ImportError:
+    st.error("The 'ta' library is not installed. Please install it using 'pip install ta'.")
 
 # Function to fetch stock data
 def fetch_stock_data(ticker):
@@ -11,7 +14,7 @@ def fetch_stock_data(ticker):
 
 # Function to calculate momentum indicators
 def calculate_indicators(stock_data):
-    stock_data['RSI'] = ta.momentum.RSIIndicator(stock_data['Close']).rsi()
+    stock_data['RSI'] = ta.momentum.RSIIndicator(stock_data['Close'].squeeze()).rsi()
     stock_data['MACD'] = ta.trend.MACD(stock_data['Close']).macd_diff()
     stock_data['SMA_10'] = ta.trend.SMAIndicator(stock_data['Close'], window=10).sma_indicator()
     stock_data['SMA_50'] = ta.trend.SMAIndicator(stock_data['Close'], window=50).sma_indicator()
