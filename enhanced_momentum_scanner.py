@@ -19,72 +19,72 @@ def calculate_indicators(stock_data):
     stock_data['RVOL'] = stock_data['Volume'] / stock_data['Volume'].rolling(window=20).mean()
     return stock_data
 
+# Function to apply quality filters
+def apply_quality_filters(stock_data, roe_threshold, debt_to_equity_threshold):
+    stock_data = stock_data[(stock_data['ROE'] > roe_threshold) & (stock_data['Debt_to_Equity'] < debt_to_equity_threshold)]
+    return stock_data
+
 # Function to rank stocks based on momentum
 def rank_stocks(stock_data):
     stock_data['Momentum_Score'] = stock_data['RSI'] + stock_data['MACD'] + (stock_data['SMA_10'] - stock_data['SMA_50']) + stock_data['ADX'] + stock_data['RVOL']
     return stock_data
 
-# Function to apply quality filters
-def apply_quality_filters(stock_data, roe_threshold, debt_to_equity_threshold):
-    stock_data = stock_data[stock_data['ROE'] >= roe_threshold]
-    stock_data = stock_data[stock_data['Debt_to_Equity'] <= debt_to_equity_threshold]
-    return stock_data
-
 # Streamlit UI
 st.title("Indian Stock Momentum Scanner")
 
-# Dropdown for selecting index
-index_options = [
-    "Nifty 50", "Nifty Next 50", "Nifty 100", "Nifty 200", "Nifty 500",
-    "Nifty Midcap 50", "Nifty Midcap 100", "Nifty Midcap 150",
-    "Nifty Smallcap 50", "Nifty Smallcap 100", "Nifty Smallcap 250",
-    "Nifty IT", "Nifty Pharma", "Nifty Bank", "Nifty FMCG", "Nifty Auto", "Nifty Energy", "Nifty Realty"
-]
-selected_index = st.selectbox("Select Stock Index", index_options)
+# Dropdown to select index
+indices = {
+    "Nifty 50": "^NSEI",
+    "Nifty Next 50": "^NSENEXT50",
+    "Nifty 100": "^CNX100",
+    "Nifty 200": "^CNX200",
+    "Nifty 500": "^CNX500",
+    "Nifty Midcap 50": "^CNXMID50",
+    "Nifty Midcap 100": "^CNXMID100",
+    "Nifty Midcap 150": "^CNXMID150",
+    "Nifty Smallcap 50": "^CNXSMCAP50",
+    "Nifty Smallcap 100": "^CNXSMCAP100",
+    "Nifty Smallcap 250": "^CNXSMCAP250",
+    "Nifty IT": "^CNXIT",
+    "Nifty Pharma": "^CNXPHARMA",
+    "Nifty Bank": "^NSEBANK",
+    "Nifty FMCG": "^CNXFMCG",
+    "Nifty Auto": "^CNXAUTO",
+    "Nifty Energy": "^CNXENERGY",
+    "Nifty Realty": "^CNXREALTY"
+}
+
+index = st.selectbox("Select Stock Index", list(indices.keys()))
 
 # Input for quality filters
-roe_threshold = st.slider("Minimum ROE (%)", 0, 50, 15)
-debt_to_equity_threshold = st.slider("Maximum Debt-to-Equity Ratio", 0.0, 3.0, 1.0)
+roe_threshold = st.number_input("ROE Threshold", value=10.0)
+debt_to_equity_threshold = st.number_input("Debt-to-Equity Threshold", value=1.0)
 
-# Placeholder for stock data
-stock_data = pd.DataFrame()
+if index:
+    # Fetch and display stock data
+    index_ticker = indices[index]
+    stock_data = fetch_stock_data(index_ticker)
+    st.write(f"Stock Data for {index}")
+    st.dataframe(stock_data.tail(10))
 
-# Fetch stock data for the selected index
-if selected_index:
-    # Example tickers for demonstration (replace with actual tickers for each index)
-    tickers = {
-        "Nifty 50": ["RELIANCE.NS", "TCS.NS", "HDFCBANK.NS"],
-        "Nifty Next 50": ["BAJAJHLDNG.NS", "DMART.NS", "ICICIPRULI.NS"],
-        "Nifty 100": ["INFY.NS", "HINDUNILVR.NS", "KOTAKBANK.NS"],
-        # Add more tickers for other indices
-    }
-    selected_tickers = tickers.get(selected_index, [])
-
-    for ticker in selected_tickers:
-        data = fetch_stock_data(ticker)
-        data = calculate_indicators(data)
-        data['Ticker'] = ticker
-        stock_data = pd.concat([stock_data, data])
+    # Calculate and display indicators
+    stock_data = calculate_indicators(stock_data)
+    st.write("Momentum Indicators")
+    st.dataframe(stock_data[['RSI', 'MACD', 'SMA_10', 'SMA_50', 'ADX', 'RVOL']].tail(10))
 
     # Apply quality filters
-    stock_data['ROE'] = 20  # Example ROE value (replace with actual data)
-    stock_data['Debt_to_Equity'] = 0.5  # Example Debt-to-Equity value (replace with actual data)
     stock_data = apply_quality_filters(stock_data, roe_threshold, debt_to_equity_threshold)
 
-    # Rank stocks based on momentum
+    # Rank and display momentum stocks
     stock_data = rank_stocks(stock_data)
-    top_stocks = stock_data.groupby('Ticker').tail(1).sort_values(by='Momentum_Score', ascending=False).head(5)
-
-    # Display top 5 momentum stocks
+    top_stocks = stock_data.nlargest(5, 'Momentum_Score')
     st.write("Top 5 Momentum Stocks")
-    st.dataframe(top_stocks[['Ticker', 'Momentum_Score', 'RSI', 'MACD', 'SMA_10', 'SMA_50', 'ADX', 'RVOL']])
+    st.dataframe(top_stocks[['Momentum_Score']])
 
     # Plotting
-    for ticker in top_stocks['Ticker']:
-        st.write(f"Stock Data for {ticker}")
-        ticker_data = stock_data[stock_data['Ticker'] == ticker]
-        st.line_chart(ticker_data[['Close', 'SMA_10', 'SMA_50']])
-        st.line_chart(ticker_data[['RSI']])
-        st.line_chart(ticker_data[['MACD']])
-        st.line_chart(ticker_data[['ADX']])
-        st.line_chart(ticker_data[['RVOL']])
+    for ticker in top_stocks.index:
+        st.write(f"Stock: {ticker}")
+        st.line_chart(stock_data.loc[ticker, ['Close', 'SMA_10', 'SMA_50']])
+        st.line_chart(stock_data.loc[ticker, ['RSI']])
+        st.line_chart(stock_data.loc[ticker, ['MACD']])
+        st.line_chart(stock_data.loc[ticker, ['ADX']])
